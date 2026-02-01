@@ -11,7 +11,7 @@ from web_article_extractor.extractor import ArticleExtractor
 from web_article_extractor.models import ExtractionResult
 
 
-class TestArticleExtractor:
+class TestArticleExtractor:  # pylint: disable=too-many-public-methods
     """Tests for ArticleExtractor class."""
 
     def test_normalize_date_valid(self):
@@ -258,3 +258,47 @@ class TestArticleExtractor:
 
         with pytest.raises(ValueError, match="URL columns not found"):
             extractor.process_csv(input_csv, output_csv, config)
+
+    def test_extract_date_from_url(self):
+        """Test date extraction from URL patterns."""
+        extractor = ArticleExtractor(gemini_api=Mock())
+
+        # Test /2024/01/15/ pattern
+        assert extractor.extract_date_from_url("https://example.com/2024/01/15/article") == "2024-01-15"
+        # Test 2024-01-15 pattern
+        assert extractor.extract_date_from_url("https://example.com/article-2024-01-15") == "2024-01-15"
+        # Test no date
+        assert extractor.extract_date_from_url("https://example.com/article") is None
+
+    def test_extract_with_gemini_empty_response(self):
+        """Test Gemini extraction with empty response."""
+        mock_gemini = Mock()
+        mock_gemini.query.return_value = None
+
+        extractor = ArticleExtractor(gemini_api=mock_gemini)
+        text, date = extractor.extract_with_gemini("https://example.com")
+
+        assert text is None
+        assert date is None
+
+    @patch("web_article_extractor.extractor.requests.get")
+    def test_process_csv_with_skip_domains(self, mock_get, tmp_path):  # pylint: disable=unused-argument
+        """Test CSV processing with domain skipping."""
+        input_csv = tmp_path / "input.csv"
+        input_data = pd.DataFrame(
+            {
+                "id": ["1"],
+                "url": ["https://instagram.com/test"],
+            }
+        )
+        input_data.to_csv(input_csv, index=False)
+
+        config = Config(id_column="id", url_columns=["url"], skip_domains=["instagram.com"])
+        extractor = ArticleExtractor(gemini_api=Mock())
+        output_csv = tmp_path / "output.csv"
+
+        extractor.process_csv(input_csv, output_csv, config)
+
+        # Should create empty output (header only)
+        output_data = pd.read_csv(output_csv)
+        assert len(output_data) == 0
