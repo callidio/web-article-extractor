@@ -1,7 +1,9 @@
 """Article extraction with HTML parsing and LLM fallback."""
 
 import json
+import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
@@ -29,6 +31,7 @@ class ArticleExtractor:
             gemini_api: Optional GeminiAPI instance. If None, creates new one.
         """
         self.gemini_api = gemini_api or GeminiAPI()
+        self.gemini_calls = 0
 
     def extract_with_newspaper(self, url: str) -> tuple[str | None, str | None]:
         """
@@ -56,7 +59,16 @@ class ArticleExtractor:
                 "Insufficient text from newspaper", extra={"url": url, "text_length": len(text or "")}
             )
             return None, None
-        except (ArticleDownloadError, ArticleParseError, ValueError, OSError) as e:
+        except (  # pylint: disable=broad-exception-caught
+            ArticleDownloadError,
+            ArticleParseError,
+            requests.HTTPError,
+            requests.RequestException,
+            ValueError,
+            OSError,
+            Exception,
+        ) as e:
+            # Justified: newspaper3k can raise various unexpected exceptions
             logger.debug("Newspaper extraction failed", extra={"url": url, "error": str(e)})
             return None, None
 
@@ -105,6 +117,7 @@ class ArticleExtractor:
         Returns:
             Tuple of (text, date) or (None, None) if extraction fails
         """
+        self.gemini_calls += 1
         try:
             # Fetch URL content
             response = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
@@ -125,6 +138,11 @@ Return only valid JSON, no additional text."""
             # Query Gemini
             response_text = self.gemini_api.query(prompt)
 
+            # Check if response is valid
+            if not response_text:
+                logger.error("Gemini returned empty response", extra={"url": url})
+                return None, None
+
             # Parse JSON response
             response_text = response_text.strip()
             if response_text.startswith("```json"):
@@ -136,7 +154,8 @@ Return only valid JSON, no additional text."""
             response_text = response_text.strip()
 
             result = json.loads(response_text)
-            text = result.get("text", "").strip()
+            text = result.get("text", "") if result.get("text") else ""
+            text = text.strip() if text else ""
             date = result.get("date")
 
             if text and len(text) > 100:
@@ -148,6 +167,49 @@ Return only valid JSON, no additional text."""
         except (LLMExtractionError, requests.RequestException, json.JSONDecodeError, KeyError) as e:
             logger.error("Gemini extraction failed", extra={"url": url, "error": str(e)})
             return None, None
+
+    def extract_date_from_url(self, url: str) -> str | None:
+        """
+        Extract publication date from URL path.
+
+        Common patterns:
+        - /2024/01/15/article
+        - /2024-01-15/article
+        - /article-2024-01-15
+
+        Args:
+            url: URL to extract date from
+
+        Returns:
+            ISO 8601 formatted date string or None
+        """
+        try:
+            # Common date patterns in URLs
+            patterns = [
+                r"/(\d{4})/(\d{1,2})/(\d{1,2})/",  # /2024/01/15/
+                r"/(\d{4})-(\d{1,2})-(\d{1,2})",  # /2024-01-15
+                r"-(\d{4})-(\d{1,2})-(\d{1,2})",  # article-2024-01-15
+                r"/(\d{4})(\d{2})(\d{2})/",  # /20240115/
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, url)
+                if match:
+                    year, month, day = match.groups()
+                    # Validate date components
+                    year_int = int(year)
+                    month_int = int(month)
+                    day_int = int(day)
+
+                    if 1900 <= year_int <= 2100 and 1 <= month_int <= 12 and 1 <= day_int <= 31:
+                        date_str = f"{year_int:04d}-{month_int:02d}-{day_int:02d}"
+                        # Validate the date is actually valid
+                        parsed = date_parser.parse(date_str)
+                        return parsed.date().isoformat()
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.debug("Failed to extract date from URL", extra={"url": url, "error": str(e)})
+
+        return None
 
     def normalize_date(self, date_str: str | None) -> str | None:
         """
@@ -192,6 +254,9 @@ Return only valid JSON, no additional text."""
         text, date = self.extract_with_newspaper(url)
         if text:
             normalized_date = self.normalize_date(date)
+            # Fallback to URL date extraction if no date found
+            if not normalized_date:
+                normalized_date = self.extract_date_from_url(url)
             return ExtractionResult(
                 id_value=id_value,
                 url=url,
@@ -205,6 +270,9 @@ Return only valid JSON, no additional text."""
         text, date = self.extract_with_trafilatura(url)
         if text:
             normalized_date = self.normalize_date(date)
+            # Fallback to URL date extraction if no date found
+            if not normalized_date:
+                normalized_date = self.extract_date_from_url(url)
             return ExtractionResult(
                 id_value=id_value,
                 url=url,
@@ -218,6 +286,9 @@ Return only valid JSON, no additional text."""
         text, date = self.extract_with_gemini(url)
         if text:
             normalized_date = self.normalize_date(date)
+            # Fallback to URL date extraction if no date found
+            if not normalized_date:
+                normalized_date = self.extract_date_from_url(url)
             return ExtractionResult(
                 id_value=id_value,
                 url=url,
@@ -233,7 +304,9 @@ Return only valid JSON, no additional text."""
             id_value=id_value, url=url, error_message="All extraction methods failed"
         )
 
-    def process_csv(self, input_csv: str | Path, output_csv: str | Path, config: Config) -> None:
+    def process_csv(  # pylint: disable=too-many-locals
+        self, input_csv: str | Path, output_csv: str | Path, config: Config
+    ) -> None:
         """
         Process CSV file and extract articles from URLs.
 
@@ -256,10 +329,19 @@ Return only valid JSON, no additional text."""
         if missing_cols:
             raise ValueError(f"URL columns not found in CSV: {missing_cols}")
 
+        # Create or open output CSV file
+        output_path = Path(output_csv)
+
+        # Write header if file doesn't exist
+        if not output_path.exists():
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write("id,url,extracted_text,publication_date,extraction_method,status,error_message\n")
+
         # Process each row and URL column
-        results = []
         total_urls = len(df) * len(config.url_columns)
         processed = 0
+        success_count = 0
+        error_count = 0
 
         for _, row in df.iterrows():
             id_value = str(row[config.id_column])
@@ -268,38 +350,75 @@ Return only valid JSON, no additional text."""
                 url = row[url_col]
                 processed += 1
 
+                # Skip empty or NaN URLs
+                if pd.isna(url) or not url or (isinstance(url, str) and not url.strip()):
+                    logger.debug(
+                        "Skipping empty URL",
+                        extra={"progress": f"{processed}/{total_urls}", "id": id_value, "column": url_col},
+                    )
+                    continue
+
+                # Skip URLs from blocked domains
+                if config.skip_domains:
+                    try:
+                        parsed_url = urlparse(url)
+                        domain = parsed_url.netloc.lower()
+                        # Remove www. prefix for comparison
+                        if domain.startswith("www."):
+                            domain = domain[4:]
+
+                        if any(skip_domain.lower() in domain for skip_domain in config.skip_domains):
+                            logger.info(
+                                "Skipping blocked domain",
+                                extra={
+                                    "progress": f"{processed}/{total_urls}",
+                                    "id": id_value,
+                                    "url": url,
+                                    "domain": domain,
+                                },
+                            )
+                            continue
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        logger.debug(
+                            "Failed to parse URL for domain check", extra={"url": url, "error": str(e)}
+                        )
+
                 logger.info(
                     "Processing URL",
                     extra={"progress": f"{processed}/{total_urls}", "id": id_value, "column": url_col},
                 )
 
                 result = self.extract_from_url(url, id_value)
-                results.append(result)
 
-        # Create output DataFrame
-        output_df = pd.DataFrame(
-            [
-                {
-                    "id": r.id_value,
-                    "url": r.url,
-                    "extracted_text": r.extracted_text,
-                    "publication_date": r.publication_date,
-                    "extraction_method": r.extraction_method,
-                    "status": r.status,
-                    "error_message": r.error_message,
-                }
-                for r in results
-            ]
-        )
+                # Update counters
+                if result.status == "success":
+                    success_count += 1
+                else:
+                    error_count += 1
 
-        # Save output CSV
-        output_df.to_csv(output_csv, index=False)
+                # Write result immediately to CSV
+                result_df = pd.DataFrame(
+                    [
+                        {
+                            "id": result.id_value,
+                            "url": result.url,
+                            "extracted_text": result.extracted_text,
+                            "publication_date": result.publication_date,
+                            "extraction_method": result.extraction_method,
+                            "status": result.status,
+                            "error_message": result.error_message,
+                        }
+                    ]
+                )
+                result_df.to_csv(output_path, mode="a", header=False, index=False)
+
         logger.info(
             "CSV processing complete",
             extra={
                 "output": str(output_csv),
-                "total": len(results),
-                "success": sum(1 for r in results if r.status == "success"),
-                "errors": sum(1 for r in results if r.status == "error"),
+                "total": success_count + error_count,
+                "success": success_count,
+                "errors": error_count,
+                "gemini_calls": self.gemini_calls,
             },
         )

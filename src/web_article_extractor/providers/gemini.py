@@ -23,7 +23,7 @@ class GeminiAPI(BaseAPIProvider):
 
     def get_default_model(self) -> str:
         """Return default Gemini model."""
-        return "gemini-2.0-flash-exp"
+        return "gemini-2.5-flash"
 
     def query(self, prompt: str) -> str:
         """
