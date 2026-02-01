@@ -21,7 +21,7 @@ class TestGeminiAPI:
         """Test getting default model name."""
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
             api = GeminiAPI()
-            assert api.get_default_model() == "gemini-2.0-flash-exp"
+            assert api.get_default_model() == "gemini-2.5-flash"
 
     def test_gemini_api_missing_key(self):
         """Test error when API key is missing."""
