@@ -1,0 +1,50 @@
+name: PR Title Check
+
+# Enforces conventional commit format for PR titles
+# This ensures compatibility with ietf-tools/semver-action@v1 for automatic version bumping
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-pr-title:
+    name: Check PR Title Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Types recognized by ietf-tools/semver-action for version bumping:
+          # - feat: minor version bump (new features)
+          # - fix: patch version bump (bug fixes)
+          # - Other types: patch version bump (patchAll: true in semver-action)
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          # Require a scope (optional)
+          requireScope: false
+          # Ensure subject starts with lowercase
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            starts with a lowercase letter.
+          # Ignore PR titles that are merged by bots
+          ignoreLabels: |
+            bot
+            dependencies
+          # Validate conventional commit format
+          headerPattern: '^(\w+)(?:\(([^)]*)\))?!?: (.+)$'
+          headerPatternCorrespondence: type, scope, subject
