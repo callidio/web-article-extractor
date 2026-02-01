@@ -62,11 +62,11 @@ class BaseAPIProvider(ABC):
     @abstractmethod
     def get_env_key_name(self) -> str:
         """Return environment variable name for API key"""
-    
+
     @abstractmethod
     def get_default_model(self) -> str:
         """Return default model name"""
-    
+
     @abstractmethod
     def query(self, prompt: str) -> str:
         """Query the API with a prompt"""
@@ -103,7 +103,7 @@ from pydantic import BaseModel, Field, field_validator
 class Config(BaseModel):
     id_column: str = Field(..., description="Column name for unique IDs")
     url_columns: list[str] = Field(..., description="URL column names")
-    
+
     @field_validator("url_columns")
     @classmethod
     def validate_url_columns(cls, v: list[str]) -> list[str]:
@@ -379,10 +379,10 @@ import openai
 class OpenAIProvider(BaseAPIProvider):
     def get_env_key_name(self) -> str:
         return "OPENAI_API_KEY"
-    
+
     def get_default_model(self) -> str:
         return "gpt-4"
-    
+
     # ... implement other methods
 ```
 
@@ -403,7 +403,7 @@ class OpenAIProvider(BaseAPIProvider):
    ```python
    def _write_json(self, results, path):
        # Convert ExtractionResult to JSON
-   
+
    def _write_parquet(self, results, path):
        # Convert ExtractionResult to Parquet
    ```

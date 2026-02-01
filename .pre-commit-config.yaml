@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -12,46 +12,34 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 26.1.0
     hooks:
       - id: black
-        args: ["--line-length=108"]
+        args: ["--line-length=108", "--target-version=py313"]
         language_version: python3.13
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 7.0.0
     hooks:
       - id: isort
-        args: ["--profile=black", "--line-length=108"]
+        args: ["--profile=black", "--line-length=108", "--py=313"]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.15.0
+    rev: v3.21.2
     hooks:
       - id: pyupgrade
         args: ["--py313-plus"]
 
-  - repo: https://github.com/pylint-dev/pylint
-    rev: v3.0.3
+  - repo: local
     hooks:
       - id: pylint
+        name: pylint
+        entry: pylint
+        language: system
+        types: [python]
         args:
           - "--fail-under=10.0"
           - "--max-line-length=108"
-        additional_dependencies:
-          - google-generativeai
-          - newspaper3k
-          - trafilatura
-          - pyyaml
-          - pydantic
-          - pydantic-settings
-          - pandas
-          - requests
-          - click
-          - python-json-logger
-          - python-dateutil
-
-  - repo: local
-    hooks:
       - id: pytest-coverage
         name: pytest-coverage
         entry: pytest

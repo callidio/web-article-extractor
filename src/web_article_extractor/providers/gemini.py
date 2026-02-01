@@ -5,6 +5,10 @@ import google.generativeai as genai
 from .base import BaseAPIProvider
 
 
+class GeminiAPIError(Exception):
+    """Custom exception for Gemini API errors."""
+
+
 class GeminiAPI(BaseAPIProvider):
     """Google Gemini API provider."""
 
@@ -43,4 +47,4 @@ class GeminiAPI(BaseAPIProvider):
             response = self.client.generate_content(prompt, generation_config=generation_config)
             return response.text
         except Exception as e:
-            raise Exception(f"Gemini API error: {e}") from e
+            raise GeminiAPIError(f"Gemini API error: {e}") from e

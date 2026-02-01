@@ -57,4 +57,4 @@ def main(input_csv: Path, output_csv: Path, config: Path, log_level: str) -> Non
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pylint: disable=no-value-for-parameter

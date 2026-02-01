@@ -1,9 +1,7 @@
 """Tests for CLI module."""
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
 from click.testing import CliRunner
 
 from web_article_extractor.cli import main
@@ -44,14 +42,12 @@ class TestCLI:
         config_yaml.write_text("id_column: id\nurl_columns:\n  - url")
 
         runner = CliRunner()
-        
+
         with patch("web_article_extractor.cli.ArticleExtractor") as mock_extractor:
             mock_instance = Mock()
             mock_extractor.return_value = mock_instance
-            
-            result = runner.invoke(
-                main, [str(input_csv), "-o", str(output_csv), "-c", str(config_yaml)]
-            )
+
+            result = runner.invoke(main, [str(input_csv), "-o", str(output_csv), "-c", str(config_yaml)])
 
             assert result.exit_code == 0
             assert "Extraction complete" in result.output
@@ -65,11 +61,11 @@ class TestCLI:
         config_yaml.write_text("id_column: id\nurl_columns:\n  - url")
 
         runner = CliRunner()
-        
+
         with patch("web_article_extractor.cli.ArticleExtractor") as mock_extractor:
             mock_instance = Mock()
             mock_extractor.return_value = mock_instance
-            
+
             result = runner.invoke(
                 main,
                 [str(input_csv), "--output-csv", str(output_csv), "--config", str(config_yaml)],
@@ -86,12 +82,12 @@ class TestCLI:
         config_yaml.write_text("id_column: id\nurl_columns:\n  - url")
 
         runner = CliRunner()
-        
+
         with patch("web_article_extractor.cli.ArticleExtractor") as mock_extractor:
             with patch("web_article_extractor.cli.setup_logger") as mock_logger:
                 mock_instance = Mock()
                 mock_extractor.return_value = mock_instance
-                
+
                 result = runner.invoke(
                     main,
                     [
@@ -131,9 +127,7 @@ class TestCLI:
         config_yaml.write_text("id_column: id\nurl_columns:\n  - url")
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["nonexistent.csv", "-o", str(output_csv), "-c", str(config_yaml)]
-        )
+        result = runner.invoke(main, ["nonexistent.csv", "-o", str(output_csv), "-c", str(config_yaml)])
 
         assert result.exit_code != 0
 
@@ -144,9 +138,7 @@ class TestCLI:
         output_csv = tmp_path / "output.csv"
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, [str(input_csv), "-o", str(output_csv), "-c", "nonexistent.yaml"]
-        )
+        result = runner.invoke(main, [str(input_csv), "-o", str(output_csv), "-c", "nonexistent.yaml"])
 
         assert result.exit_code != 0
 
@@ -159,13 +151,11 @@ class TestCLI:
         config_yaml.write_text("id_column: id\nurl_columns:\n  - url")
 
         runner = CliRunner()
-        
+
         with patch("web_article_extractor.cli.Config.from_yaml") as mock_config:
             mock_config.side_effect = Exception("Config error")
-            
-            result = runner.invoke(
-                main, [str(input_csv), "-o", str(output_csv), "-c", str(config_yaml)]
-            )
+
+            result = runner.invoke(main, [str(input_csv), "-o", str(output_csv), "-c", str(config_yaml)])
 
             assert result.exit_code != 0
             assert "Error" in result.output

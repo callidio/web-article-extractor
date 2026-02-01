@@ -237,14 +237,14 @@ import openai
 class OpenAIProvider(BaseAPIProvider):
     def get_env_key_name(self) -> str:
         return "OPENAI_API_KEY"
-    
+
     def get_default_model(self) -> str:
         return "gpt-4"
-    
+
     def _initialize_client(self):
         openai.api_key = self.api_key
         return openai
-    
+
     def query(self, prompt: str) -> str:
         response = self.client.ChatCompletion.create(
             model=self.model,
