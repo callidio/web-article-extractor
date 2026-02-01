@@ -7,6 +7,12 @@ on:
   push:
     tags:
       - '*'  # Trigger on any tag push
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to create release for'
+        required: true
+        type: string
 
 permissions:
   contents: write  # Required to create releases
@@ -32,8 +38,12 @@ jobs:
       - name: Get tag name
         id: tag
         run: |
-          # Extract tag name from ref
-          TAG_NAME=${GITHUB_REF#refs/tags/}
+          # Extract tag name from ref or use manual input
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ inputs.tag }}"
+          else
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+          fi
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "Creating release for tag: ${TAG_NAME}"
 
@@ -42,8 +52,8 @@ jobs:
           GH_TOKEN: ${{ steps.generate_token.outputs.token }}
           TAG_NAME: ${{ steps.tag.outputs.tag_name }}
         run: |
-          # Get the previous tag (excluding current tag, take first)
-          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG_NAME}$" | head -n 1 || echo "")
+          # Get the previous tag chronologically (by commit date, excluding current tag)
+          PREVIOUS_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG_NAME}$" | head -n 1 || echo "")
 
           # Generate release notes using GitHub CLI
           if [ -n "$PREVIOUS_TAG" ]; then
