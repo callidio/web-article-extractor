@@ -1,0 +1,106 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "web-article-extractor"
+version = "0.1.0"
+description = "A generic module for extracting text and dates from web articles"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Biagio Frusteri", email = "spaziovettoriale@gmail.com"}
+]
+keywords = ["web-scraping", "article-extraction", "llm", "gemini"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "google-generativeai>=0.8.0",
+    "newspaper3k>=0.2.8",
+    "trafilatura>=1.12.0",
+    "pyyaml>=6.0.1",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.1.0",
+    "pandas>=2.2.0",
+    "requests>=2.31.0",
+    "click>=8.1.7",
+    "python-json-logger>=2.0.7",
+    "python-dateutil>=2.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "coverage>=7.4.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "pylint>=3.0.0",
+    "pre-commit>=3.6.0",
+    "pyupgrade>=3.15.0",
+]
+
+[project.scripts]
+web-article-extractor = "web_article_extractor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 108
+target-version = ["py313"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 108
+py_version = 313
+
+[tool.pylint.main]
+py-version = "3.13"
+jobs = 0
+fail-under = 10.0
+
+[tool.pylint.format]
+max-line-length = 108
+
+[tool.pylint.messages_control]
+disable = [
+    "C0114",  # missing-module-docstring (we have docstrings where needed)
+    "C0116",  # missing-function-docstring (we document complex functions)
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=web_article_extractor",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=90",
+    "--strict-markers",
+    "-v"
+]
+
+[tool.coverage.run]
+source = ["src/web_article_extractor"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false

@@ -1,0 +1,61 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: debug-statements
+
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        args: ["--line-length=108"]
+        language_version: python3.13
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile=black", "--line-length=108"]
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.15.0
+    hooks:
+      - id: pyupgrade
+        args: ["--py313-plus"]
+
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v3.0.3
+    hooks:
+      - id: pylint
+        args:
+          - "--fail-under=10.0"
+          - "--max-line-length=108"
+        additional_dependencies:
+          - google-generativeai
+          - newspaper3k
+          - trafilatura
+          - pyyaml
+          - pydantic
+          - pydantic-settings
+          - pandas
+          - requests
+          - click
+          - python-json-logger
+          - python-dateutil
+
+  - repo: local
+    hooks:
+      - id: pytest-coverage
+        name: pytest-coverage
+        entry: pytest
+        args: ["--cov=web_article_extractor", "--cov-fail-under=90", "--cov-report=term-missing:skip-covered"]
+        language: system
+        pass_filenames: false
+        always_run: true

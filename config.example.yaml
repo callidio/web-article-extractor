@@ -1,0 +1,5 @@
+id_column: rest_id
+url_columns:
+  - Web site restaurant
+  - Web site Chef
+  - Web
