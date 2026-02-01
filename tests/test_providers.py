@@ -31,7 +31,7 @@ class TestGeminiAPI:
 
     @patch("google.generativeai.configure")
     @patch("google.generativeai.GenerativeModel")
-    def test_gemini_api_query(self, mock_model_class, mock_configure):
+    def test_gemini_api_query(self, mock_model_class, mock_configure):  # pylint: disable=unused-argument
         """Test querying Gemini API."""
         # Setup mocks
         mock_response = Mock()
@@ -49,7 +49,9 @@ class TestGeminiAPI:
 
     @patch("google.generativeai.configure")
     @patch("google.generativeai.GenerativeModel")
-    def test_gemini_api_query_error(self, mock_model_class, mock_configure):
+    def test_gemini_api_query_error(
+        self, mock_model_class, mock_configure
+    ):  # pylint: disable=unused-argument
         """Test error handling in Gemini query."""
         mock_model = Mock()
         mock_model.generate_content.side_effect = Exception("API Error")
@@ -62,7 +64,9 @@ class TestGeminiAPI:
 
     @patch("google.generativeai.configure")
     @patch("google.generativeai.GenerativeModel")
-    def test_gemini_api_custom_model(self, mock_model_class, mock_configure):
+    def test_gemini_api_custom_model(
+        self, mock_model_class, mock_configure
+    ):  # pylint: disable=unused-argument
         """Test using custom model."""
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
             api = GeminiAPI(model="gemini-1.5-pro")

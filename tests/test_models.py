@@ -27,13 +27,9 @@ class TestModels:
 
     def test_extraction_result_error(self):
         """Test ExtractionResult with error."""
-        result = ExtractionResult(
+        result = ExtractionResult.create_error(
             id_value="456",
             url="https://example.com/error",
-            extracted_text="",
-            publication_date=None,
-            extraction_method="none",
-            status="error",
             error_message="All extraction methods failed",
         )
 
@@ -70,3 +66,19 @@ class TestModels:
 
         assert result.extraction_method == "gemini"
         assert result.status == "success"
+
+    def test_extraction_result_create_error_factory(self):
+        """Test ExtractionResult.create_error factory method."""
+        result = ExtractionResult.create_error(
+            id_value="error-id",
+            url="https://example.com/error",
+            error_message="Test error message",
+        )
+
+        assert result.id_value == "error-id"
+        assert result.url == "https://example.com/error"
+        assert result.extracted_text == ""
+        assert result.publication_date is None
+        assert result.extraction_method == "none"
+        assert result.status == "error"
+        assert result.error_message == "Test error message"

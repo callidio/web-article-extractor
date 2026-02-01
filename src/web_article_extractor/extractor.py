@@ -1,7 +1,6 @@
 """Article extraction with HTML parsing and LLM fallback."""
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +10,7 @@ from dateutil import parser as date_parser
 from newspaper import Article
 
 from .config import Config
+from .exceptions import ArticleDownloadError, ArticleParseError, HTMLFetchError, LLMExtractionError
 from .logger import get_logger
 from .models import ExtractionResult
 from .providers.gemini import GeminiAPI
@@ -52,9 +52,11 @@ class ArticleExtractor:
                 logger.info("Extraction successful", extra={"url": url, "method": "newspaper"})
                 return text, date
 
-            logger.debug("Insufficient text from newspaper", extra={"url": url, "text_length": len(text or "")})
+            logger.debug(
+                "Insufficient text from newspaper", extra={"url": url, "text_length": len(text or "")}
+            )
             return None, None
-        except Exception as e:
+        except (ArticleDownloadError, ArticleParseError, ValueError, OSError) as e:
             logger.debug("Newspaper extraction failed", extra={"url": url, "error": str(e)})
             return None, None
 
@@ -85,10 +87,11 @@ class ArticleExtractor:
                 return text, date
 
             logger.debug(
-                "Insufficient text from trafilatura", extra={"url": url, "text_length": len(text or "")}
+                "Insufficient text from trafilatura",
+                extra={"url": url, "text_length": len(text or "")},
             )
             return None, None
-        except Exception as e:
+        except (HTMLFetchError, ValueError, OSError) as e:
             logger.debug("Trafilatura extraction failed", extra={"url": url, "error": str(e)})
             return None, None
 
@@ -142,7 +145,7 @@ Return only valid JSON, no additional text."""
 
             logger.warning("Insufficient text from Gemini", extra={"url": url, "text_length": len(text)})
             return None, None
-        except Exception as e:
+        except (LLMExtractionError, requests.RequestException, json.JSONDecodeError, KeyError) as e:
             logger.error("Gemini extraction failed", extra={"url": url, "error": str(e)})
             return None, None
 
@@ -178,14 +181,8 @@ Return only valid JSON, no additional text."""
             ExtractionResult with extraction details
         """
         if not url or not isinstance(url, str) or not url.strip():
-            return ExtractionResult(
-                id_value=id_value,
-                url=url or "",
-                extracted_text="",
-                publication_date=None,
-                extraction_method="none",
-                status="error",
-                error_message="Empty or invalid URL",
+            return ExtractionResult.create_error(
+                id_value=id_value, url=url or "", error_message="Empty or invalid URL"
             )
 
         url = url.strip()
@@ -232,14 +229,8 @@ Return only valid JSON, no additional text."""
 
         # All methods failed
         logger.error("All extraction methods failed", extra={"url": url, "id": id_value})
-        return ExtractionResult(
-            id_value=id_value,
-            url=url,
-            extracted_text="",
-            publication_date=None,
-            extraction_method="none",
-            status="error",
-            error_message="All extraction methods failed",
+        return ExtractionResult.create_error(
+            id_value=id_value, url=url, error_message="All extraction methods failed"
         )
 
     def process_csv(self, input_csv: str | Path, output_csv: str | Path, config: Config) -> None:
@@ -270,7 +261,7 @@ Return only valid JSON, no additional text."""
         total_urls = len(df) * len(config.url_columns)
         processed = 0
 
-        for idx, row in df.iterrows():
+        for _, row in df.iterrows():
             id_value = str(row[config.id_column])
 
             for url_col in config.url_columns:

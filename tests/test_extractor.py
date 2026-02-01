@@ -1,10 +1,10 @@
 """Tests for extractor module."""
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
+import requests
 
 from web_article_extractor.config import Config
 from web_article_extractor.extractor import ArticleExtractor
@@ -55,7 +55,7 @@ class TestArticleExtractor:
         mock_article_class.return_value = mock_article
 
         extractor = ArticleExtractor(gemini_api=Mock())
-        text, date = extractor.extract_with_newspaper("https://example.com")
+        text, _ = extractor.extract_with_newspaper("https://example.com")
 
         assert text is not None
         assert len(text) > 100
@@ -64,7 +64,7 @@ class TestArticleExtractor:
     def test_extract_with_newspaper_failure(self, mock_article_class):
         """Test failed extraction with newspaper3k."""
         mock_article = Mock()
-        mock_article.download.side_effect = Exception("Download failed")
+        mock_article.download.side_effect = OSError("Download failed")
         mock_article_class.return_value = mock_article
 
         extractor = ArticleExtractor(gemini_api=Mock())
@@ -95,7 +95,7 @@ class TestArticleExtractor:
         mock_extract.return_value = "Article text content " * 20
 
         extractor = ArticleExtractor(gemini_api=Mock())
-        text, date = extractor.extract_with_trafilatura("https://example.com")
+        text, _ = extractor.extract_with_trafilatura("https://example.com")
 
         assert text is not None
         assert len(text) > 100
@@ -132,7 +132,7 @@ class TestArticleExtractor:
     @patch("web_article_extractor.extractor.requests.get")
     def test_extract_with_gemini_failure(self, mock_get):
         """Test failed extraction with Gemini."""
-        mock_get.side_effect = Exception("Request failed")
+        mock_get.side_effect = requests.RequestException("Request failed")
 
         mock_gemini = Mock()
         extractor = ArticleExtractor(gemini_api=mock_gemini)
@@ -214,7 +214,7 @@ class TestArticleExtractor:
 
         # Mock extractor
         extractor = ArticleExtractor(gemini_api=Mock())
-        
+
         with patch.object(extractor, "extract_from_url") as mock_extract:
             mock_extract.return_value = ExtractionResult(
                 id_value="1",

@@ -1,0 +1,106 @@
+name: Auto Version Bump
+
+# This workflow automatically bumps the version and pushes directly to main
+# using GitHub App authentication (AutoBot-Callidio)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    # Skip if the commit was made by the bot to prevent infinite loops
+    if: github.actor != 'AutoBot-Callidio[bot]' && github.event.head_commit.author.name != 'AutoBot-Callidio[bot]'
+    permissions:
+      contents: write  # Required to push to main and create tags
+
+    steps:
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.AUTOBOT_CALLIDIO_APP_ID }}
+          private-key: ${{ secrets.AUTOBOT_CALLIDIO_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Full history needed for version calculation
+          token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Calculate next version
+        id: semver
+        uses: ietf-tools/semver-action@v1
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          branch: main
+          patchAll: true
+          skipInvalidTags: true
+
+      - name: Set up Python
+        if: steps.semver.outputs.nextStrict != ''
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Update version in pyproject.toml
+        if: steps.semver.outputs.nextStrict != ''
+        run: |
+          NEW_VERSION="${{ steps.semver.outputs.nextStrict }}"
+          echo "Updating version to: $NEW_VERSION"
+
+          # Update version in pyproject.toml
+          sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" pyproject.toml
+
+          # Show the change
+          echo "Updated pyproject.toml:"
+          grep "^version = " pyproject.toml
+
+      - name: Commit and push version bump
+        if: steps.semver.outputs.nextStrict != ''
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          NEW_VERSION="${{ steps.semver.outputs.nextStrict }}"
+
+          # Configure git with bot identity
+          git config user.name "AutoBot-Callidio[bot]"
+          git config user.email "181520972+AutoBot-Callidio[bot]@users.noreply.github.com"
+
+          # Commit changes
+          git add pyproject.toml
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+
+          # Push to main
+          git push origin main
+
+          echo "✓ Pushed version bump to main"
+
+      - name: Create and push tag
+        if: steps.semver.outputs.nextStrict != ''
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          NEW_VERSION="${{ steps.semver.outputs.nextStrict }}"
+
+          # Create annotated tag
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+
+          # Push tag
+          git push origin "$NEW_VERSION"
+
+          echo "✓ Created and pushed tag: $NEW_VERSION"
+
+      - name: Summary
+        if: steps.semver.outputs.nextStrict != ''
+        run: |
+          echo "## Version Bump Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Version:** ${{ steps.semver.outputs.current }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Version:** ${{ steps.semver.outputs.nextStrict }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag Created:** Yes ✓" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The release workflow will now automatically create a GitHub release." >> $GITHUB_STEP_SUMMARY
