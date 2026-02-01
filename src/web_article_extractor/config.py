@@ -11,6 +11,9 @@ class Config(BaseModel):
 
     id_column: str = Field(..., description="Name of the column containing unique identifiers")
     url_columns: list[str] = Field(..., description="List of column names containing URLs to extract")
+    skip_domains: list[str] = Field(
+        default_factory=list, description="List of domains to skip (e.g., instagram.com, nytimes.com)"
+    )
 
     @field_validator("url_columns")
     @classmethod

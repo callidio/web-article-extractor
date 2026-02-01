@@ -3,10 +3,14 @@
 from pathlib import Path
 
 import click
+from dotenv import load_dotenv
 
 from .config import Config
 from .extractor import ArticleExtractor
 from .logger import setup_logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 @click.command()
